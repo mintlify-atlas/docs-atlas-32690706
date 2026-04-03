@@ -1,0 +1,91 @@
+---
+title: "Adding to the community plugin list"
+description: "Submit your plugin to the Obsidian community plugin directory"
+---
+
+Once your plugin is stable and publicly released, you can submit it for inclusion in the Obsidian community plugin directory. Listed plugins are discoverable directly inside Obsidian via **Settings → Community plugins → Browse**.
+
+<Tip>
+  Before submitting, search the [community plugin directory](https://obsidian.md/plugins) to confirm your plugin's purpose is unique or fills a clear gap. If a similar plugin already exists, consider contributing to it instead of creating a duplicate.
+</Tip>
+
+## Pre-submission checklist
+
+<Steps>
+  <Step title="Read the plugin guidelines">
+    Read the [Plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines) in full before submitting. The Obsidian team enforces these guidelines during review, and submissions that violate them will be rejected.
+  </Step>
+
+  <Step title="Publish at least one release">
+    Your repository must have at least one published GitHub release with `manifest.json`, `main.js`, and (if applicable) `styles.css` attached. See [Creating a GitHub release](/releasing/github-release) for the full process.
+  </Step>
+
+  <Step title="Add a README.md">
+    Your repository must have a `README.md` at the root that explains what your plugin does, how to use it, and any configuration options. Reviewers and users rely on this file to understand your plugin's purpose.
+  </Step>
+
+  <Step title="Verify your manifest.json fields">
+    Make sure `manifest.json` contains all required fields:
+
+    ```json manifest.json
+    {
+      "id": "sample-plugin",
+      "name": "Sample Plugin",
+      "version": "1.0.0",
+      "minAppVersion": "0.15.0",
+      "description": "Demonstrates some of the capabilities of the Obsidian API.",
+      "isDesktopOnly": false
+    }
+    ```
+
+    The required fields are: `id`, `name`, `version`, `minAppVersion`, `description`, and `isDesktopOnly`. See the [validate-plugin-entry.yml](https://github.com/obsidianmd/obsidian-releases/blob/master/.github/workflows/validate-plugin-entry.yml) workflow for the canonical list of validation rules.
+
+    <Warning>
+      The `fundingUrl` field accepts either a single URL string or an object map of label → URL — both formats are valid. Using any other format will fail validation.
+
+      ```json Single URL
+      { "fundingUrl": "https://buymeacoffee.com" }
+      ```
+
+      ```json Multiple URLs
+      {
+        "fundingUrl": {
+          "Buy Me a Coffee": "https://buymeacoffee.com",
+          "GitHub Sponsor": "https://github.com/sponsors"
+        }
+      }
+      ```
+    </Warning>
+  </Step>
+
+  <Step title="Confirm your plugin ID is unique">
+    Your `id` in `manifest.json` must not conflict with any existing plugin in the community list. Check the [community-plugins.json](https://github.com/obsidianmd/obsidian-releases/blob/master/community-plugins.json) file in the `obsidian-releases` repository to verify your ID is not already taken. The `id` is permanent — you cannot change it after your plugin is listed.
+  </Step>
+
+  <Step title="Submit a pull request to obsidian-releases">
+    Open a pull request to [obsidianmd/obsidian-releases](https://github.com/obsidianmd/obsidian-releases) that adds your plugin entry to `community-plugins.json`. The entry format is:
+
+    ```json community-plugins.json entry
+    {
+      "id": "your-plugin-id",
+      "name": "Your Plugin Name",
+      "author": "Your Name",
+      "description": "A short description of what your plugin does.",
+      "repo": "your-github-username/your-repo-name"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Review process
+
+After you open the pull request, the Obsidian team runs automated validation and a manual review:
+
+1. **Automated validation** — a GitHub Actions workflow checks that your `manifest.json` fields are valid, your repo is accessible, and your latest release contains the required assets.
+2. **Manual review** — the Obsidian team inspects your plugin for compliance with the plugin guidelines, security concerns, and quality standards.
+
+Review times vary. Once approved, your plugin appears in the in-app browser and on [obsidian.md/plugins](https://obsidian.md/plugins).
+
+<Note>
+  You do not need to resubmit after each new release. Once your plugin is listed, Obsidian picks up new versions automatically from your GitHub releases.
+</Note>

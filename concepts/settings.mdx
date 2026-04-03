@@ -1,0 +1,176 @@
+---
+title: "Settings"
+description: "Persist plugin configuration with a settings tab and loadData/saveData"
+---
+
+Obsidian gives every plugin its own persistent data store. You read from it with `this.loadData()` and write to it with `this.saveData()`. Data is stored as JSON inside the vault's `.obsidian/plugins/<plugin-id>/data.json` file.
+
+The sample plugin organizes everything settings-related in `src/settings.ts`, keeping `main.ts` focused on lifecycle logic.
+
+## Define your settings
+
+Start by declaring a TypeScript interface for your settings shape and a constant that provides the default values:
+
+```typescript
+export interface MyPluginSettings {
+    mySetting: string;
+}
+
+export const DEFAULT_SETTINGS: MyPluginSettings = {
+    mySetting: 'default'
+}
+```
+
+The interface gives you compile-time type safety. The defaults object ensures your plugin works correctly even before the user has opened the settings tab.
+
+## Load and save settings
+
+Add `loadSettings` and `saveSettings` methods to your plugin class:
+
+```typescript
+async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+}
+
+async saveSettings() {
+    await this.saveData(this.settings);
+}
+```
+
+Call `loadSettings()` at the top of `onload()` so settings are available before any other initialization runs:
+
+```typescript
+async onload() {
+    await this.loadSettings();
+    // ... rest of onload
+}
+```
+
+<Tip>
+The `Object.assign({}, DEFAULT_SETTINGS, await this.loadData())` pattern is intentional. It merges your defaults with whatever the user has saved, so adding a new setting with a default value works correctly even for users who already have an older `data.json` without that key.
+</Tip>
+
+## Create a settings tab
+
+A settings tab is a class that extends `PluginSettingTab`. Obsidian calls its `display()` method whenever the user opens your plugin's settings page.
+
+```typescript
+import { App, PluginSettingTab, Setting } from "obsidian";
+import MyPlugin from "./main";
+
+export class SampleSettingTab extends PluginSettingTab {
+    plugin: MyPlugin;
+
+    constructor(app: App, plugin: MyPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const { containerEl } = this;
+
+        containerEl.empty();
+
+        new Setting(containerEl)
+            .setName('Settings #1')
+            .setDesc('It\'s a secret')
+            .addText(text => text
+                .setPlaceholder('Enter your secret')
+                .setValue(this.plugin.settings.mySetting)
+                .onChange(async (value) => {
+                    this.plugin.settings.mySetting = value;
+                    await this.plugin.saveSettings();
+                }));
+    }
+}
+```
+
+### The `Setting` builder
+
+Each `new Setting(containerEl)` call renders one row in the settings UI. The builder chain lets you configure it:
+
+| Method | Purpose |
+|---|---|
+| `.setName(string)` | The setting's label, shown in bold |
+| `.setDesc(string)` | A short description shown below the label |
+| `.addText(callback)` | Adds a text input field |
+| `.addToggle(callback)` | Adds an on/off toggle |
+| `.addDropdown(callback)` | Adds a select dropdown |
+| `.addButton(callback)` | Adds a clickable button |
+
+Inside `.addText`, the `onChange` callback fires whenever the input value changes. Call `saveSettings()` there so the new value is written to disk immediately.
+
+### Start fresh in `display()`
+
+Notice the call to `containerEl.empty()` at the top of `display()`. Obsidian may call `display()` more than once (for example, when the user navigates away and back). Clearing the container first prevents duplicate UI elements from accumulating.
+
+## Register the settings tab
+
+Pass an instance of your settings tab class to `addSettingTab()` inside `onload()`:
+
+```typescript
+this.addSettingTab(new SampleSettingTab(this.app, this));
+```
+
+Obsidian automatically removes the settings tab when the plugin is disabled.
+
+## Complete settings workflow
+
+Here is the full pattern, from interface definition through to save:
+
+```typescript
+// settings.ts
+import { App, PluginSettingTab, Setting } from "obsidian";
+import MyPlugin from "./main";
+
+export interface MyPluginSettings {
+    mySetting: string;
+}
+
+export const DEFAULT_SETTINGS: MyPluginSettings = {
+    mySetting: 'default'
+}
+
+export class SampleSettingTab extends PluginSettingTab {
+    plugin: MyPlugin;
+
+    constructor(app: App, plugin: MyPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const { containerEl } = this;
+        containerEl.empty();
+
+        new Setting(containerEl)
+            .setName('Settings #1')
+            .setDesc('It\'s a secret')
+            .addText(text => text
+                .setPlaceholder('Enter your secret')
+                .setValue(this.plugin.settings.mySetting)
+                .onChange(async (value) => {
+                    this.plugin.settings.mySetting = value;
+                    await this.plugin.saveSettings();
+                }));
+    }
+}
+
+// main.ts (relevant parts)
+export default class MyPlugin extends Plugin {
+    settings: MyPluginSettings;
+
+    async onload() {
+        await this.loadSettings();
+        this.addSettingTab(new SampleSettingTab(this.app, this));
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+}
+```

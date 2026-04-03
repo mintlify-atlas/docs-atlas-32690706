@@ -1,0 +1,88 @@
+{
+  "projectType": "framework",
+  "projectName": "Obsidian Sample Plugin",
+  "projectDescription": "A template and reference implementation for building Obsidian community plugins with TypeScript, esbuild, and best-practice project structure.",
+  "theme": "palm",
+  "primaryColor": "#9b74fa",
+  "lightColor": "#ffffff",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "project-structure"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/plugin-lifecycle",
+              "concepts/commands",
+              "concepts/settings",
+              "concepts/ui-components"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/build-system",
+              "development/linting",
+              "development/manifest"
+            ]
+          },
+          {
+            "group": "Releasing",
+            "pages": [
+              "releasing/versioning",
+              "releasing/github-release",
+              "releasing/community-list"
+            ]
+          },
+          {
+            "group": "Best Practices",
+            "pages": [
+              "best-practices/code-organization",
+              "best-practices/performance",
+              "best-practices/security",
+              "best-practices/mobile"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "TypeScript-based plugin template with strict type checking",
+    "esbuild bundler configuration for fast builds and watch mode",
+    "ESLint integration with Obsidian-specific plugin rules",
+    "Plugin lifecycle management (onload/onunload) with safe listener registration",
+    "Settings tab with persistent data storage via loadData/saveData",
+    "Command palette integration with simple, editor, and conditional command types",
+    "Ribbon icon and status bar item examples",
+    "Modal UI component example",
+    "Automated version bumping with manifest.json and versions.json sync",
+    "GitHub Actions CI workflow for linting and build validation"
+  ],
+  "publicApiSurface": [
+    "Plugin.onload() — plugin entry point and initialization",
+    "Plugin.onunload() — cleanup on plugin disable",
+    "Plugin.addCommand(command) — register a command palette entry",
+    "Plugin.addRibbonIcon(icon, title, callback) — add left ribbon icon",
+    "Plugin.addStatusBarItem() — add status bar element",
+    "Plugin.addSettingTab(tab) — register settings UI",
+    "Plugin.loadData() / Plugin.saveData(data) — persist plugin settings",
+    "Plugin.registerEvent(event) — register and auto-clean workspace events",
+    "Plugin.registerDomEvent(el, type, callback) — register and auto-clean DOM events",
+    "Plugin.registerInterval(id) — register and auto-clean setInterval",
+    "MyPluginSettings interface — typed settings object",
+    "DEFAULT_SETTINGS — default values for plugin settings",
+    "SampleSettingTab extends PluginSettingTab — settings UI component",
+    "SampleModal extends Modal — modal dialog component"
+  ]
+}

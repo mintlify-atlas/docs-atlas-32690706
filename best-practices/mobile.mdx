@@ -1,0 +1,112 @@
+---
+title: "Mobile compatibility"
+description: "Build plugins that work on Obsidian for iOS and Android, not just desktop"
+---
+
+Obsidian runs on iOS and Android, and many users rely on the mobile apps as their primary interface. By default, your plugin is available on mobile. Writing mobile-compatible code from the start is much easier than retrofitting it later.
+
+## The `isDesktopOnly` flag
+
+`manifest.json` includes an `isDesktopOnly` field. When set to `false` (the default), Obsidian will offer your plugin to mobile users.
+
+```json
+{
+  "id": "sample-plugin",
+  "name": "Sample Plugin",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Demonstrates some of the capabilities of the Obsidian API.",
+  "author": "Obsidian",
+  "authorUrl": "https://obsidian.md",
+  "isDesktopOnly": false
+}
+```
+
+The sample plugin ships with `isDesktopOnly: false`, meaning it is expected to run on mobile without crashing.
+
+<Tip>
+If your plugin genuinely requires desktop-only APIs (Electron, native Node modules, system integration), set `isDesktopOnly: true` in `manifest.json`. This is much better than crashing silently or showing broken UI on mobile.
+</Tip>
+
+## What breaks on mobile
+
+Mobile Obsidian does not embed Node.js or Electron. Code that works perfectly on desktop will throw at runtime on iOS and Android if it touches these APIs.
+
+### Node.js built-ins are not available
+
+Modules like `fs`, `path`, `child_process`, `os`, and `crypto` do not exist in the mobile runtime.
+
+```typescript
+// This crashes on mobile
+import * as fs from "fs";
+const content = fs.readFileSync("file.txt", "utf8");
+```
+
+Use Obsidian's vault API instead:
+
+```typescript
+// This works everywhere
+const content = await this.app.vault.read(file);
+```
+
+### Electron APIs are not available
+
+`require("electron")`, `shell.openExternal`, `ipcRenderer`, and similar APIs are desktop-only.
+
+### The status bar is not rendered on mobile
+
+`this.addStatusBarItem()` creates an element in the desktop app's status bar. On mobile, this element is not displayed. Code that calls it will not crash, but any content you put there will be invisible to mobile users. Use `Notice` or settings for information that must reach mobile users.
+
+<Warning>
+Do not use `require('fs')` or any other Node.js built-in module. On mobile this throws a runtime error and disables your plugin.
+</Warning>
+
+## Detecting mobile at runtime
+
+Sometimes you need to branch on the current platform — for example, to show a mobile-friendly alternative to a desktop-only feature. Use `Platform` from the Obsidian API rather than inspecting `navigator.userAgent` or other heuristics.
+
+```typescript
+import { Platform } from "obsidian";
+
+if (!Platform.isMobile) {
+  // Desktop-only code here — Electron APIs, status bar, etc.
+  this.addStatusBarItem().setText("Connected");
+}
+
+if (Platform.isMobile) {
+  // Mobile-specific fallback
+  new Notice("This feature is available on desktop only.");
+}
+```
+
+You can also use `this.app.isMobile` as a boolean check inside your plugin class.
+
+```typescript
+async onload() {
+  if (!this.app.isMobile) {
+    const statusBarItem = this.addStatusBarItem();
+    statusBarItem.setText("Status bar text");
+  }
+}
+```
+
+## Practical guidelines
+
+**Test on both platforms before publishing.** Behavior that is fine on desktop can crash or silently fail on iOS and Android. Install your plugin on a real device or simulator and exercise every command and UI element.
+
+**Prefer the Obsidian vault API over raw file system access.** `app.vault.read()`, `app.vault.modify()`, `app.vault.create()`, and `app.vault.delete()` work across all platforms.
+
+**Keep memory usage low.** Mobile devices have much tighter memory constraints than desktops. Avoid large in-memory caches, limit the size of any index you build, and release references when they are no longer needed.
+
+**Avoid large dependencies.** Every byte in `main.js` is loaded into memory. Prefer small, browser-compatible packages. If a dependency pulls in Node.js polyfills or native bindings, it will bloat your bundle and may break on mobile.
+
+<Note>
+The Obsidian `requestUrl` API is the correct way to make HTTP requests on all platforms, including mobile. Do not use `node-fetch`, `axios`, or the raw `http` module — they rely on Node.js internals that are absent on mobile.
+</Note>
+
+## Testing on mobile
+
+1. Build your plugin: `npm run build`
+2. Copy `main.js`, `manifest.json`, and `styles.css` (if present) to your mobile vault under `.obsidian/plugins/<plugin-id>/`
+3. In Obsidian mobile, go to **Settings → Community plugins**, enable your plugin, and test every feature
+4. Check the developer console for runtime errors (on iOS, use Safari's Web Inspector connected via cable)

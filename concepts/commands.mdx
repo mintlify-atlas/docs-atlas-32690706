@@ -1,0 +1,130 @@
+---
+title: "Commands"
+description: "Add commands to the Obsidian command palette using addCommand"
+---
+
+Commands let users trigger your plugin's functionality from the command palette (Ctrl/Cmd+P), hotkeys, or the mobile toolbar. You register a command by calling `this.addCommand()` inside `onload()`.
+
+There are three command types, each suited to a different scenario: simple commands, editor commands, and conditional commands.
+
+<Note>
+Command IDs are permanent. Treat them as stable identifiers — once your plugin is released, never rename a command ID. Users may have bound hotkeys to it, and renaming breaks those assignments silently.
+</Note>
+
+## Command types
+
+<Tabs>
+  <Tab title="Simple command">
+
+A simple command uses the `callback` property. It appears in the palette at all times and runs immediately when selected.
+
+```typescript
+this.addCommand({
+    id: 'open-modal-simple',
+    name: 'Open modal (simple)',
+    callback: () => {
+        new SampleModal(this.app).open();
+    }
+});
+```
+
+Use `callback` when your command does not depend on editor state and can run from anywhere in the app — for example, opening a modal, triggering a sync, or resetting a counter.
+
+  </Tab>
+  <Tab title="Editor command">
+
+An editor command uses the `editorCallback` property. Obsidian only shows it in the palette when a markdown editor is active. When the command runs, Obsidian passes the active `Editor` instance and the current `MarkdownView` directly.
+
+```typescript
+this.addCommand({
+    id: 'replace-selected',
+    name: 'Replace selected content',
+    editorCallback: (editor: Editor, view: MarkdownView) => {
+        editor.replaceSelection('Sample editor command');
+    }
+});
+```
+
+Use `editorCallback` whenever your command reads or modifies the editor — for example, inserting text, transforming selected content, or reading the cursor position.
+
+  </Tab>
+  <Tab title="Conditional command">
+
+A conditional command uses `checkCallback`. Obsidian calls it with `checking: true` to test whether the command should appear, and again with `checking: false` to actually run it.
+
+```typescript
+this.addCommand({
+    id: 'open-modal-complex',
+    name: 'Open modal (complex)',
+    checkCallback: (checking: boolean) => {
+        // Conditions to check
+        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (markdownView) {
+            // If checking is true, we're simply "checking" if the command can be run.
+            // If checking is false, then we want to actually perform the operation.
+            if (!checking) {
+                new SampleModal(this.app).open();
+            }
+
+            // This command will only show up in Command Palette when the check function returns true
+            return true;
+        }
+        return false;
+    }
+});
+```
+
+Use `checkCallback` when you need full control over availability — for example, showing a command only when a specific file type is open or when a particular plugin state is active.
+
+  </Tab>
+</Tabs>
+
+## The `checking` parameter
+
+The `checkCallback` function receives a single boolean argument: `checking`.
+
+- When `checking` is `true`, Obsidian is asking: "should this command appear right now?" Return `true` to include it in the palette, `false` to hide it. Do not perform any side effects.
+- When `checking` is `false`, Obsidian has already confirmed the check passed and is now executing the command. Perform your action here.
+
+```typescript
+checkCallback: (checking: boolean) => {
+    const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (markdownView) {
+        if (!checking) {
+            // Only runs when checking is false — i.e., the command is actually being executed
+            new SampleModal(this.app).open();
+        }
+        return true; // Command is available
+    }
+    return false; // Command is hidden
+}
+```
+
+Always guard your action code inside `if (!checking)`. Running side effects during the availability check can cause unexpected behavior, since Obsidian may call the check function frequently.
+
+## Command IDs
+
+A command ID must be:
+
+- **Unique** within your plugin — two commands with the same ID will conflict.
+- **Stable** across releases — changing a command ID is a breaking change for users who have assigned hotkeys.
+
+Obsidian prefixes your command ID with your plugin ID internally, so `open-modal-simple` becomes something like `my-plugin:open-modal-simple` in the global command registry. You only need to keep your IDs unique within your own plugin.
+
+## Registering commands
+
+All `addCommand` calls belong inside `onload()`. Commands registered with `addCommand` are automatically unregistered when the plugin is disabled — you do not need to clean them up manually.
+
+```typescript
+async onload() {
+    // ...
+    this.addCommand({
+        id: 'open-modal-simple',
+        name: 'Open modal (simple)',
+        callback: () => {
+            new SampleModal(this.app).open();
+        }
+    });
+    // ...
+}
+```

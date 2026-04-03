@@ -1,0 +1,116 @@
+---
+title: "Versioning"
+description: "Manage plugin versions with semantic versioning and the automated version bump script"
+---
+
+Obsidian plugins use [Semantic Versioning](https://semver.org/) (SemVer) to communicate the nature of each release.
+
+## Semantic versioning
+
+A version number has three parts: `major.minor.patch`.
+
+| Part | When to increment |
+|------|-------------------|
+| `patch` | Bug fixes and small changes that don't add new functionality |
+| `minor` | New features that are backwards-compatible |
+| `major` | Breaking changes or significant rewrites |
+
+For example, going from `1.0.0` to `1.0.1` signals a patch-level fix, while going to `1.1.0` signals a new feature.
+
+## The versions.json file
+
+`versions.json` maps each plugin version to the minimum Obsidian app version required to run it. Obsidian reads this file to determine which version of your plugin to offer each user based on the version of Obsidian they have installed.
+
+```json versions.json
+{
+	"1.0.0": "0.15.0"
+}
+```
+
+Each key is a released plugin version; the value is the `minAppVersion` that was set in `manifest.json` at the time of that release. This lets users on older Obsidian builds download a compatible older release of your plugin rather than seeing an incompatible version.
+
+## The version-bump.mjs script
+
+The repository includes a `version-bump.mjs` script that automates keeping `manifest.json` and `versions.json` in sync whenever you bump the version in `package.json`.
+
+```javascript version-bump.mjs
+import { readFileSync, writeFileSync } from "fs";
+
+const targetVersion = process.env.npm_package_version;
+
+// read minAppVersion from manifest.json and bump version to target version
+const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+const { minAppVersion } = manifest;
+manifest.version = targetVersion;
+writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t"));
+
+// update versions.json with target version and minAppVersion from manifest.json
+// but only if the target version is not already in versions.json
+const versions = JSON.parse(readFileSync('versions.json', 'utf8'));
+if (!Object.values(versions).includes(minAppVersion)) {
+    versions[targetVersion] = minAppVersion;
+    writeFileSync('versions.json', JSON.stringify(versions, null, '\t'));
+}
+```
+
+The script does two things:
+
+1. **Updates `manifest.json`** — reads the current `manifest.json`, sets the `version` field to the new version from `npm_package_version`, and writes the file back.
+2. **Updates `versions.json`** — adds an entry mapping the new version to the current `minAppVersion` from `manifest.json`, but only if that `minAppVersion` value does not already appear anywhere in `versions.json`. This means if you bump the patch version without changing `minAppVersion`, no new entry is added.
+
+This script is wired to the `version` lifecycle hook in `package.json`:
+
+```json package.json
+"scripts": {
+  "version": "node version-bump.mjs && git add manifest.json versions.json"
+}
+```
+
+npm runs the `version` script automatically after updating `package.json`, so both manifest files are updated and staged for commit in a single step.
+
+## Running the version bump
+
+Use `npm version` with one of three sub-commands depending on the kind of change you're releasing.
+
+<CodeGroup>
+
+```bash Patch release
+# 1.0.0 → 1.0.1
+npm version patch
+```
+
+```bash Minor release
+# 1.0.0 → 1.1.0
+npm version minor
+```
+
+```bash Major release
+# 1.0.0 → 2.0.0
+npm version major
+```
+
+</CodeGroup>
+
+Each command:
+
+1. Bumps the version in `package.json`
+2. Runs `version-bump.mjs` to update `manifest.json` and `versions.json`
+3. Stages `manifest.json` and `versions.json` for commit via `git add`
+
+## Updating minAppVersion manually
+
+Before running the version bump, update `minAppVersion` in `manifest.json` whenever your new release starts using an Obsidian API that requires a higher app version.
+
+For example, if you start using an API introduced in Obsidian `1.5.0`, set:
+
+```json manifest.json
+{
+  "minAppVersion": "1.5.0"
+}
+```
+
+Then run `npm version patch` (or `minor`/`major`). The script reads the updated `minAppVersion` and records it in `versions.json` alongside the new plugin version.
+
+<Warning>
+Keep `minAppVersion` accurate. If your plugin calls a `1.5.x` API but declares `minAppVersion: "0.15.0"`, Obsidian will offer the plugin to users on older versions — and those users will get a crash on load. Always raise `minAppVersion` when you adopt a newer API.
+</Warning>

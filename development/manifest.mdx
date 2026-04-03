@@ -1,0 +1,100 @@
+---
+title: "Plugin manifest"
+description: "Configure manifest.json with your plugin's identity, version, and compatibility settings"
+---
+
+`manifest.json` is the identity document for your plugin. Obsidian reads it to display your plugin in the community list, determine compatibility with the running app version, and track the plugin across installs and updates.
+
+## Sample manifest
+
+```json manifest.json
+{
+	"id": "sample-plugin",
+	"name": "Sample Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Demonstrates some of the capabilities of the Obsidian API.",
+	"author": "Obsidian",
+	"authorUrl": "https://obsidian.md",
+	"fundingUrl": "https://obsidian.md/pricing",
+	"isDesktopOnly": false
+}
+```
+
+## Fields
+
+<ParamField path="id" type="string" required>
+  The unique identifier for your plugin. Obsidian uses this to track the plugin across installs, updates, and the community catalog. It must match the folder name of the plugin inside the vault (`.obsidian/plugins/<id>/`).
+
+  Use lowercase letters, numbers, and hyphens. Example: `"my-plugin"`.
+
+  <Warning>
+    Never change `id` after you publish your plugin. It is the stable identifier that Obsidian uses to recognise your plugin. Changing it after release creates a duplicate entry and breaks existing installs.
+  </Warning>
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  The display name shown in **Settings → Community plugins**. This is what users see when browsing or searching for your plugin. Use title case. Example: `"My Plugin"`.
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  The current plugin version in [Semantic Versioning](https://semver.org) format: `x.y.z`. Do not include a leading `v` — use `"1.2.0"`, not `"v1.2.0"`.
+
+  Bump this value in `manifest.json` and the corresponding entry in `versions.json` whenever you release a new version. The GitHub release tag must exactly match this string.
+</ParamField>
+
+<ParamField path="minAppVersion" type="string" required>
+  The minimum version of Obsidian that can run this plugin. Users on older versions will see the plugin as incompatible and will not be able to install it.
+
+  Keep this accurate. If you use an API method introduced in a newer Obsidian version, update `minAppVersion` to match so users get a clear incompatibility message rather than a runtime crash.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  A short description of what your plugin does. This text is shown in the community plugins list and on your plugin's detail page. Keep it to one or two sentences.
+</ParamField>
+
+<ParamField path="author" type="string">
+  Your name or the name of the person or organisation that maintains the plugin.
+</ParamField>
+
+<ParamField path="authorUrl" type="string">
+  An optional URL linking to the author — your personal website, GitHub profile, or organisation page. Displayed alongside the author name in the plugin details view.
+</ParamField>
+
+<ParamField path="fundingUrl" type="string">
+  An optional URL or map of URLs for supporting the plugin financially. Obsidian displays a funding button in the plugin details view when this is set.
+
+  You can provide a single string URL:
+
+  ```json
+  "fundingUrl": "https://github.com/sponsors/yourname"
+  ```
+
+  Or a map of platform names to URLs:
+
+  ```json
+  "fundingUrl": {
+    "GitHub Sponsors": "https://github.com/sponsors/yourname",
+    "Buy Me a Coffee": "https://buymeacoffee.com/yourname"
+  }
+  ```
+</ParamField>
+
+<ParamField path="isDesktopOnly" type="boolean" required default="false">
+  Set to `true` if your plugin uses Node.js built-ins, Electron APIs, or any other desktop-only capability. Obsidian will prevent mobile users from installing a plugin marked as desktop-only.
+
+  Set to `false` if your plugin works on iOS and Android as well as desktop. Avoid Node and Electron APIs in that case — see [Mobile](/best-practices/mobile) for guidance.
+</ParamField>
+
+## Where manifest.json must exist
+
+`manifest.json` must be present in two places:
+
+1. **Repo root** — checked into version control so Obsidian's community catalog can read it.
+2. **GitHub release assets** — attached as an individual file asset on each release, alongside `main.js` and `styles.css` (if present).
+
+When a user installs your plugin, Obsidian downloads the release assets and places them in the vault. If `manifest.json` is missing from the release, Obsidian cannot install the plugin.
+
+<Note>
+  The `versions.json` file maps each plugin version to the minimum required Obsidian version. Keep it in sync with `manifest.json` whenever you bump the version. The `npm run version` script handles both files automatically.
+</Note>

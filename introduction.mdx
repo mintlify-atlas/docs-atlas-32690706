@@ -1,0 +1,67 @@
+---
+title: "Introduction"
+description: "Welcome to the Obsidian Sample Plugin — a complete template and reference implementation for building Obsidian community plugins with TypeScript."
+---
+
+The Obsidian Sample Plugin is the official starting point for building [Obsidian](https://obsidian.md) community plugins. It demonstrates the core Plugin API patterns, project structure, and development workflow used by thousands of plugins in the Obsidian ecosystem.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get your first plugin running in minutes using the sample plugin as a template
+  </Card>
+  <Card title="Project Structure" icon="folder-open" href="/project-structure">
+    Understand how files are organized and what each piece does
+  </Card>
+  <Card title="Plugin Lifecycle" icon="rotate" href="/concepts/plugin-lifecycle">
+    Learn how Obsidian loads, runs, and unloads your plugin
+  </Card>
+  <Card title="Commands" icon="terminal" href="/concepts/commands">
+    Add commands to the command palette for users to trigger actions
+  </Card>
+</CardGroup>
+
+## What this template gives you
+
+The sample plugin is a fully working Obsidian plugin that demonstrates the most common extension points in the Plugin API:
+
+- **Ribbon icon** — a clickable icon in the left sidebar that shows a Notice
+- **Command palette commands** — three types: simple, editor-scoped, and conditional
+- **Settings tab** — a configuration UI that persists data between sessions
+- **DOM and workspace event listeners** — registered safely so they clean up on plugin disable
+- **Recurring intervals** — managed by the plugin lifecycle so they never leak
+
+## Who this is for
+
+This template is designed for developers building Obsidian community plugins — whether you're making a productivity tool, a custom view, a file manager, or anything in between. You write TypeScript, bundle it with esbuild, and Obsidian loads your `main.js` at startup.
+
+<Note>
+  Before building a new plugin, [check if one already exists](https://obsidian.md/plugins) that does what you need. The community has thousands of plugins and you may find a collaborator rather than starting from scratch.
+</Note>
+
+## How to get started
+
+<Steps>
+  <Step title="Use this template">
+    Click **Use this template** on the [GitHub repository](https://github.com/obsidianmd/obsidian-sample-plugin) to create your own copy. This gives you a fresh repo with all the boilerplate in place.
+  </Step>
+  <Step title="Install dependencies">
+    Clone your new repo and run `npm install` to install TypeScript, esbuild, and the Obsidian type definitions.
+  </Step>
+  <Step title="Start the dev server">
+    Run `npm run dev` to compile in watch mode. Edit `src/main.ts` and Obsidian picks up changes after a reload.
+  </Step>
+  <Step title="Load the plugin">
+    Copy `main.js`, `manifest.json`, and `styles.css` into your vault's `.obsidian/plugins/your-plugin-id/` folder, then enable it in **Settings → Community plugins**.
+  </Step>
+</Steps>
+
+## Key files at a glance
+
+| File | Purpose |
+|------|---------|
+| `src/main.ts` | Plugin entry point — lifecycle, commands, and event registration |
+| `src/settings.ts` | Settings interface, defaults, and the settings tab UI |
+| `manifest.json` | Plugin metadata required by Obsidian |
+| `styles.css` | Optional CSS bundled with the plugin |
+| `esbuild.config.mjs` | Build configuration for bundling TypeScript to `main.js` |
+| `versions.json` | Maps plugin versions to minimum Obsidian app versions |

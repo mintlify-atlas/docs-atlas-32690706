@@ -1,0 +1,153 @@
+---
+title: "UI components"
+description: "Add ribbon icons, status bar items, modals, and notices to your plugin"
+---
+
+Obsidian exposes several built-in UI surfaces that your plugin can populate: the left ribbon, the status bar, transient notices, and modal dialogs. The sample plugin demonstrates all four.
+
+## Ribbon icon
+
+The ribbon is the narrow icon bar on the left side of the Obsidian window. Call `addRibbonIcon()` to add a clickable button to it.
+
+```typescript
+this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
+    // Called when the user clicks the icon.
+    new Notice('This is a notice!');
+});
+```
+
+The three arguments are:
+
+| Argument | Description |
+|---|---|
+| `'dice'` | The icon name. Obsidian uses the [Lucide](https://lucide.dev) icon set. |
+| `'Sample'` | The tooltip text shown on hover. |
+| `callback` | The function called when the user clicks the icon. |
+
+`addRibbonIcon` returns the icon's DOM element, so you can apply a CSS class or further customize it if needed.
+
+## Status bar item
+
+The status bar runs along the bottom edge of the app. Call `addStatusBarItem()` to get a DOM element you can populate with text or HTML.
+
+```typescript
+const statusBarItemEl = this.addStatusBarItem();
+statusBarItemEl.setText('Status bar text');
+```
+
+<Note>
+Status bar items do not appear in Obsidian's mobile apps. If your plugin targets mobile, do not rely on the status bar to communicate important state.
+</Note>
+
+You can update the text at any time by calling `statusBarItemEl.setText(...)` again — for example, inside an event listener or interval to keep the display current.
+
+## Notice
+
+`Notice` displays a transient toast notification at the bottom of the screen. It disappears automatically after a few seconds.
+
+```typescript
+new Notice('This is a notice!');
+```
+
+Notices are useful for brief confirmations or error messages. They require no setup and no teardown. Use them for one-off feedback — not for persistent status updates (use the status bar for that).
+
+## Modal
+
+A modal is a dialog that overlays the workspace. Create one by extending the `Modal` class and implementing `onOpen()` and `onClose()`.
+
+### The `SampleModal` class
+
+```typescript
+class SampleModal extends Modal {
+    constructor(app: App) {
+        super(app);
+    }
+
+    onOpen() {
+        let { contentEl } = this;
+        contentEl.setText('Woah!');
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+```
+
+#### `onOpen()`
+
+Obsidian calls `onOpen()` when the modal appears. Use `this.contentEl` — the modal's body DOM element — to build your UI. You can call standard DOM methods (`setText`, `createEl`, `appendChild`) or use Obsidian's helper API.
+
+#### `onClose()`
+
+Obsidian calls `onClose()` when the modal is dismissed.
+
+<Tip>
+Always call `contentEl.empty()` in `onClose()`. This removes any DOM nodes or event listeners attached to the content element, preventing memory leaks if the modal is opened and closed multiple times.
+</Tip>
+
+### Opening a modal
+
+Construct a new instance of your modal class, passing `this.app`, then call `.open()`:
+
+```typescript
+new SampleModal(this.app).open();
+```
+
+You typically call this from a command callback, a ribbon icon handler, or any other user-triggered event:
+
+```typescript
+this.addCommand({
+    id: 'open-modal-simple',
+    name: 'Open modal (simple)',
+    callback: () => {
+        new SampleModal(this.app).open();
+    }
+});
+```
+
+## Putting it all together
+
+Here is the full set of UI registrations from `main.ts`, showing how each component fits into `onload()`:
+
+```typescript
+async onload() {
+    // Ribbon icon — left sidebar button
+    this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
+        new Notice('This is a notice!');
+    });
+
+    // Status bar item — bottom bar text (desktop only)
+    const statusBarItemEl = this.addStatusBarItem();
+    statusBarItemEl.setText('Status bar text');
+
+    // Command that opens a modal
+    this.addCommand({
+        id: 'open-modal-simple',
+        name: 'Open modal (simple)',
+        callback: () => {
+            new SampleModal(this.app).open();
+        }
+    });
+}
+
+// Modal definition
+class SampleModal extends Modal {
+    constructor(app: App) {
+        super(app);
+    }
+
+    onOpen() {
+        let { contentEl } = this;
+        contentEl.setText('Woah!');
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+```
+
+Each UI element registered through the `add*` methods is automatically removed when the plugin is disabled — you do not need to clean them up manually.

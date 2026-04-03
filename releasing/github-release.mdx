@@ -1,0 +1,85 @@
+---
+title: "Creating a GitHub release"
+description: "Publish a new version of your plugin with a properly tagged GitHub release"
+---
+
+Obsidian discovers plugin updates through GitHub releases. When a user checks for updates, Obsidian fetches your `manifest.json` from the release assets to check compatibility and reads `versions.json` from your repository to find the right release for their Obsidian version.
+
+## Release workflow
+
+<Steps>
+  <Step title="Update manifest.json">
+    Set the `version` field in `manifest.json` to your new version number and update `minAppVersion` if this release depends on a newer Obsidian API.
+
+    ```json manifest.json
+    {
+      "id": "sample-plugin",
+      "name": "Sample Plugin",
+      "version": "1.0.1",
+      "minAppVersion": "0.15.0",
+      "description": "Demonstrates some of the capabilities of the Obsidian API.",
+      "author": "Obsidian",
+      "authorUrl": "https://obsidian.md",
+      "fundingUrl": "https://obsidian.md/pricing",
+      "isDesktopOnly": false
+    }
+    ```
+
+    <Tip>
+      Use `npm version patch`, `npm version minor`, or `npm version major` to update `manifest.json` and `versions.json` automatically in one step. See [Versioning](/releasing/versioning) for details.
+    </Tip>
+  </Step>
+
+  <Step title="Update versions.json">
+    Add an entry to `versions.json` mapping your new plugin version to its required minimum Obsidian version.
+
+    ```json versions.json
+    {
+      "1.0.0": "0.15.0",
+      "1.0.1": "0.15.0"
+    }
+    ```
+
+    If you ran `npm version patch/minor/major` in the previous step, this file is already updated.
+  </Step>
+
+  <Step title="Build the plugin">
+    Run the production build to produce the final `main.js` artifact:
+
+    ```bash
+    npm run build
+    ```
+
+    This runs the TypeScript compiler check and bundles your source into `main.js` via esbuild.
+  </Step>
+
+  <Step title="Create a GitHub release with the correct tag">
+    On GitHub, go to your repository and create a new release. Set the tag to exactly the version number in `manifest.json` — for example, `1.0.1`.
+
+    <Warning>
+      Do not prefix the tag with `v`. The tag must be the bare version number (e.g., `1.0.1`, not `v1.0.1`). Obsidian matches the tag against the `version` field in `manifest.json` exactly, so a `v` prefix will break plugin updates.
+    </Warning>
+  </Step>
+
+  <Step title="Attach the release artifacts">
+    Upload the following files as binary attachments to the release:
+
+    | File | Required | Notes |
+    |------|----------|-------|
+    | `manifest.json` | Yes | Obsidian checks this before installing to verify compatibility |
+    | `main.js` | Yes | The bundled plugin code |
+    | `styles.css` | Only if present | Optional CSS for your plugin's UI |
+
+    <Note>
+      `manifest.json` must appear both at the root of your repository **and** as a release attachment. Obsidian reads the repository version to build the plugin list and reads the release attachment to verify compatibility at install time.
+    </Note>
+  </Step>
+
+  <Step title="Publish the release">
+    Click **Publish release**. Obsidian's community plugin directory will pick up the new version the next time it syncs.
+  </Step>
+</Steps>
+
+## Validation
+
+The repository includes a GitHub Actions workflow that lints and builds your plugin on every push. Before creating a release, make sure the workflow passes on your release branch — the same checks apply to the released artifacts.

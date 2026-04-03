@@ -1,0 +1,149 @@
+---
+title: "Plugin lifecycle"
+description: "How Obsidian loads, initializes, and unloads your plugin"
+---
+
+Every Obsidian plugin is a class that extends `Plugin`. Obsidian calls two lifecycle methods on your class: `onload()` when the plugin is enabled, and `onunload()` when it is disabled. Everything your plugin registers during `onload` is automatically torn down when it unloads — as long as you use the provided `register*` helpers.
+
+## `onload()`
+
+Obsidian calls `onload()` once after the plugin is enabled. This is where you set up everything your plugin needs: load persisted settings, register commands, add UI elements, and attach event listeners.
+
+Here is the complete `onload()` from the sample plugin:
+
+```typescript
+async onload() {
+    await this.loadSettings();
+
+    // This creates an icon in the left ribbon.
+    this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
+        // Called when the user clicks the icon.
+        new Notice('This is a notice!');
+    });
+
+    // This adds a status bar item to the bottom of the app. Does not work on mobile apps.
+    const statusBarItemEl = this.addStatusBarItem();
+    statusBarItemEl.setText('Status bar text');
+
+    // This adds a simple command that can be triggered anywhere
+    this.addCommand({
+        id: 'open-modal-simple',
+        name: 'Open modal (simple)',
+        callback: () => {
+            new SampleModal(this.app).open();
+        }
+    });
+
+    // This adds an editor command that can perform some operation on the current editor instance
+    this.addCommand({
+        id: 'replace-selected',
+        name: 'Replace selected content',
+        editorCallback: (editor: Editor, view: MarkdownView) => {
+            editor.replaceSelection('Sample editor command');
+        }
+    });
+
+    // This adds a complex command that can check whether the current state of the app allows execution of the command
+    this.addCommand({
+        id: 'open-modal-complex',
+        name: 'Open modal (complex)',
+        checkCallback: (checking: boolean) => {
+            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (markdownView) {
+                if (!checking) {
+                    new SampleModal(this.app).open();
+                }
+                return true;
+            }
+            return false;
+        }
+    });
+
+    // This adds a settings tab so the user can configure various aspects of the plugin
+    this.addSettingTab(new SampleSettingTab(this.app, this));
+
+    // Using this function will automatically remove the event listener when this plugin is disabled.
+    this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+        new Notice("Click");
+    });
+
+    // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
+    this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+}
+```
+
+During `onload`, the sample plugin:
+
+1. **Loads settings** — reads persisted data from disk via `loadSettings()`.
+2. **Adds a ribbon icon** — places a clickable icon in the left sidebar.
+3. **Adds a status bar item** — appends text to the bottom status bar.
+4. **Registers commands** — adds entries to the command palette.
+5. **Registers a settings tab** — makes the plugin configurable through **Settings**.
+6. **Registers a DOM event listener** — listens for `click` events on `document`.
+7. **Registers a recurring interval** — runs a function every 5 minutes.
+
+<Tip>
+Keep `onload` fast. Obsidian runs it synchronously in the startup sequence. Avoid heavy computation, large vault scans, or slow network requests here. Defer any expensive initialization until the user actually triggers a feature.
+</Tip>
+
+## `onunload()`
+
+Obsidian calls `onunload()` when the plugin is disabled or when Obsidian shuts down. The sample plugin leaves it empty:
+
+```typescript
+onunload() {
+}
+```
+
+An empty `onunload` is fine because Obsidian automatically cleans up everything you registered using the `register*` helpers. You only need to add manual teardown logic for resources you manage outside of those helpers.
+
+## Safe resource management
+
+The three `register*` helpers ensure that listeners and intervals are automatically removed when your plugin unloads. Always prefer them over raw browser APIs.
+
+### `registerEvent`
+
+Use `registerEvent` to subscribe to Obsidian workspace and vault events. When the plugin unloads, the subscription is removed automatically.
+
+```typescript
+this.registerEvent(
+    this.app.workspace.on('file-open', (file) => {
+        console.log('Opened file:', file?.path);
+    })
+);
+```
+
+### `registerDomEvent`
+
+Use `registerDomEvent` to attach listeners to any DOM element — including `document` and `window`. The sample plugin uses it to listen for clicks on the whole page:
+
+```typescript
+this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+    new Notice("Click");
+});
+```
+
+<Warning>
+Do not call `removeEventListener` manually when you registered the listener with `registerDomEvent`. Obsidian tracks the listener internally and removes it on unload. Calling `removeEventListener` yourself is redundant and can cause subtle bugs if the reference doesn't match exactly.
+</Warning>
+
+### `registerInterval`
+
+Use `registerInterval` instead of calling `window.setInterval` directly. Obsidian clears the interval when the plugin is disabled, preventing runaway background work. The sample plugin uses it to log a message every 5 minutes:
+
+```typescript
+this.registerInterval(
+    window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000)
+);
+```
+
+Note that you still call `window.setInterval` to create the interval — `registerInterval` simply takes the returned ID and ensures it is cleared at unload time.
+
+## Summary
+
+| Method | Called when | Your responsibility |
+|---|---|---|
+| `onload()` | Plugin is enabled | Set up commands, UI, listeners, and load settings |
+| `onunload()` | Plugin is disabled | Clean up anything not managed by `register*` helpers |
+
+Using the `register*` helpers consistently means your plugin can be enabled and disabled repeatedly without leaking memory or leaving dangling listeners.

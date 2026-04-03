@@ -1,0 +1,118 @@
+---
+title: "Security and privacy"
+description: "Follow Obsidian's developer policies to build safe, trustworthy plugins"
+---
+
+Obsidian plugins run with broad access to the user's vault and — on desktop — to the full Node.js and Electron runtime. Users trust plugins with their private notes. Build that trust deliberately.
+
+<Warning>
+Plugins that violate Obsidian's developer policies will be rejected from or removed from the community plugin list. These rules are not optional.
+</Warning>
+
+## Local-first by default
+
+Default to offline, local operation. If your plugin can do its job without ever making a network request, it should do so.
+
+Only make network requests when they are essential to the feature — not for telemetry, analytics, or convenience. When you do need network access, document it clearly in your `README.md` and in the settings UI so users know what leaves their device.
+
+## No hidden telemetry
+
+Never collect usage data, analytics, or error reports silently. If you want to collect any data or call third-party services:
+
+- Require explicit opt-in from the user (default off)
+- Describe exactly what is collected and where it is sent — in `README.md` and in your settings tab
+- Make it easy to disable
+
+```typescript
+// Correct: only call analytics after the user has opted in
+if (this.settings.enableAnalytics) {
+  await reportUsage(eventName);
+}
+
+// Incorrect: calling a remote service without any user knowledge or consent
+await fetch("https://example.com/track", { method: "POST", body: eventName });
+```
+
+## No remote code execution
+
+Never fetch code from a remote server and execute it. This means:
+
+- No `eval()` on remotely fetched strings
+- No dynamic `import()` from URLs
+- No auto-updating plugin code outside of Obsidian's normal release and update channels
+
+All your plugin's logic must be contained in the `main.js` bundle that ships with each release.
+
+## Vault access scope
+
+Your plugin can read and write files inside the user's vault. Keep that access minimal:
+
+- Read and modify only the files your feature actually needs
+- Do not traverse the filesystem outside the vault directory
+- Do not write to arbitrary paths via Node.js `fs` (use Obsidian's vault API instead)
+
+```typescript
+// Correct: read a file through the vault API
+const content = await this.app.vault.read(file);
+
+// Incorrect: bypass the vault to access arbitrary paths
+import * as fs from "fs";
+const content = fs.readFileSync("/Users/alice/notes/secret.md", "utf8");
+```
+
+## User privacy
+
+Do not collect, transmit, or store vault contents, filenames, or any personal information unless it is absolutely necessary for the feature and the user has given explicit, informed consent.
+
+Avoid logging sensitive content to the developer console where it might be captured in bug reports.
+
+## Safe listener cleanup
+
+Always register DOM events, workspace events, and intervals through Obsidian's `register*` helpers. These wrappers ensure your listeners are cleaned up automatically when the plugin is disabled, preventing memory leaks and phantom behavior after unload.
+
+```typescript
+// Correct: Obsidian removes this listener when the plugin is disabled
+this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+  new Notice("Click");
+});
+
+// Incorrect: this listener outlives the plugin and leaks on disable
+document.addEventListener("click", (evt: MouseEvent) => {
+  new Notice("Click");
+});
+```
+
+The same principle applies to workspace events and intervals:
+
+```typescript
+// Workspace events
+this.registerEvent(
+  this.app.workspace.on("file-open", (file) => { /* ... */ })
+);
+
+// Intervals
+this.registerInterval(
+  window.setInterval(() => { /* ... */ }, 60 * 1000)
+);
+```
+
+The sample plugin demonstrates both patterns in `main.ts:64` and `main.ts:69`.
+
+<Note>
+If you use raw `addEventListener`, `setInterval`, or workspace event subscriptions without the `register*` wrappers, your plugin will leak memory and may behave unexpectedly after being toggled off and on. Always use the helpers.
+</Note>
+
+## Avoid deceptive patterns
+
+- Do not display unsolicited ads or promotional notifications
+- Do not redirect users to external sites without a clear, voluntary action
+- Do not obscure what the plugin does or what data it touches
+
+## Plugin guidelines and developer policies
+
+Read and follow Obsidian's official guidance before publishing:
+
+- [Developer policies](https://docs.obsidian.md/Developer+policies) — the binding rules for all community plugins
+- [Plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines) — detailed expectations for code quality, UX, and disclosure
+
+When in doubt, err on the side of doing less and disclosing more.

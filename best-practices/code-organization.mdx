@@ -1,0 +1,152 @@
+---
+title: "Code organization"
+description: "Structure your plugin code across multiple files for maintainability and clarity"
+---
+
+Good code organization makes your plugin easier to read, test, and extend. The golden rule: keep `main.ts` focused exclusively on lifecycle management and top-level registration. Everything else belongs in dedicated modules.
+
+## Recommended file structure
+
+```
+src/
+  main.ts           # Plugin entry point, lifecycle management
+  settings.ts       # Settings interface and defaults
+  commands/         # Command implementations
+    command1.ts
+    command2.ts
+  ui/              # UI components, modals, views
+    modal.ts
+    view.ts
+  utils/           # Utility functions, helpers
+    helpers.ts
+    constants.ts
+  types.ts         # TypeScript interfaces and types
+```
+
+Each directory has a clear purpose. Commands live in `commands/`, UI components in `ui/`, and shared utilities in `utils/`. This makes it easy to find code and prevents any single file from growing unwieldy.
+
+## Keep `main.ts` minimal
+
+`main.ts` is your plugin's entry point. Its job is to wire everything together — not to implement features. Aim to keep it to a screen or two of code.
+
+```typescript
+import { Plugin } from "obsidian";
+import { MySettings, DEFAULT_SETTINGS } from "./settings";
+import { registerCommands } from "./commands";
+
+export default class MyPlugin extends Plugin {
+  settings: MySettings;
+
+  async onload() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    registerCommands(this);
+  }
+}
+```
+
+Notice that `onload` only loads settings and delegates command registration. It doesn't contain any business logic. If you find yourself adding feature code directly to `onload`, that's a signal to extract a module.
+
+<Note>
+The sample plugin's `main.ts` is intentionally compact — 83 lines total, including the `SampleModal` class. As your plugin grows, move modals, views, and utilities out to their own files.
+</Note>
+
+## Commands module
+
+Collect all `addCommand` calls into a `commands/index.ts` file that exports a single `registerCommands` function. Individual command implementations can live in sibling files.
+
+```typescript
+// commands/index.ts
+import { Plugin } from "obsidian";
+import { doSomething } from "./my-command";
+
+export function registerCommands(plugin: Plugin) {
+  plugin.addCommand({
+    id: "do-something",
+    name: "Do something",
+    callback: () => doSomething(plugin),
+  });
+}
+```
+
+This pattern keeps `main.ts` free of command details, and lets you add, remove, or reorganize commands without touching the entry point.
+
+## Settings module
+
+`settings.ts` owns three things: the settings interface, the default values, and the settings tab class.
+
+```typescript
+// settings.ts
+import { App, PluginSettingTab, Setting } from "obsidian";
+import MyPlugin from "./main";
+
+export interface MyPluginSettings {
+  mySetting: string;
+}
+
+export const DEFAULT_SETTINGS: MyPluginSettings = {
+  mySetting: "default",
+};
+
+export class SampleSettingTab extends PluginSettingTab {
+  plugin: MyPlugin;
+
+  constructor(app: App, plugin: MyPlugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    new Setting(containerEl)
+      .setName("Setting #1")
+      .setDesc("A description of this setting")
+      .addText((text) =>
+        text
+          .setPlaceholder("Enter a value")
+          .setValue(this.plugin.settings.mySetting)
+          .onChange(async (value) => {
+            this.plugin.settings.mySetting = value;
+            await this.plugin.saveSettings();
+          })
+      );
+  }
+}
+```
+
+Grouping the interface, defaults, and tab class together means anyone reading the code can understand your entire configuration surface in one file.
+
+## Rules for splitting files
+
+- **Size limit**: if a file exceeds ~200–300 lines, consider breaking it into smaller, focused modules.
+- **Single responsibility**: each file should have one well-defined purpose. A file called `modal.ts` should contain a modal — not a command and a utility function too.
+
+<Tip>
+Use TypeScript path aliases in `tsconfig.json` to avoid deep relative imports like `../../utils/helpers`. With an alias such as `@/`, you can write `import { helper } from "@/utils/helpers"` from anywhere in `src/`.
+</Tip>
+
+## Types
+
+Shared TypeScript interfaces and types that don't belong to a specific module go in `types.ts`. This prevents circular imports and gives you one place to look for your plugin's data shapes.
+
+```typescript
+// types.ts
+export interface ParsedNote {
+  title: string;
+  tags: string[];
+  created: Date;
+}
+```
+
+## What not to put in `main.ts`
+
+- Business logic or feature implementations
+- Modal class definitions (move to `ui/`)
+- Utility functions (move to `utils/`)
+- Large type definitions (move to `types.ts`)
+- Anything longer than a single function call per feature
+
+<Warning>
+Do not commit build artifacts to version control. Add `node_modules/`, `main.js`, and any `dist/` output to your `.gitignore`. Only source files belong in the repository.
+</Warning>

@@ -1,0 +1,152 @@
+---
+title: "Performance"
+description: "Keep your plugin fast and lightweight for all Obsidian users"
+---
+
+Obsidian loads all enabled plugins synchronously at startup. A slow `onload` directly delays how long it takes for the user's vault to become interactive. Every millisecond you save in startup time is felt by every user on every launch.
+
+## Keep `onload` fast
+
+`onload` should register commands, load settings, and set up listeners — nothing more. Move any initialization that is slow, optional, or conditional out of `onload` and defer it to the first time it's actually needed.
+
+**Fast `onload`:**
+
+```typescript
+async onload() {
+  await this.loadSettings();
+  this.addSettingTab(new SampleSettingTab(this.app, this));
+  this.addCommand({
+    id: "open-modal-simple",
+    name: "Open modal (simple)",
+    callback: () => new SampleModal(this.app).open(),
+  });
+  this.registerInterval(
+    window.setInterval(() => this.syncCache(), 5 * 60 * 1000)
+  );
+}
+```
+
+<Warning>
+Avoid performing file I/O, network requests, or expensive computation directly inside `onload`. These block every other plugin from loading until they complete.
+</Warning>
+
+## Lazy initialization
+
+If a feature requires a heavy object — a parsed index, a custom view, a connection — create it only when the user first triggers that feature, not at startup.
+
+```typescript
+private myView: MyView | undefined;
+
+getMyView(): MyView {
+  if (!this.myView) {
+    this.myView = new MyView(this.app);
+  }
+  return this.myView;
+}
+```
+
+Call `getMyView()` inside your command callbacks, not in `onload`. The first invocation pays the initialization cost; subsequent calls return the cached instance instantly.
+
+## Debounce expensive operations
+
+File system events — `modify`, `rename`, `delete` — can fire many times per second while a user is typing or syncing. Never run expensive work directly in these handlers. Debounce them so the work only runs after the event stream has quieted.
+
+```typescript
+import { debounce } from "obsidian";
+
+const debouncedRebuild = debounce(
+  () => this.rebuildIndex(),
+  500,   // wait 500 ms after the last event
+  true   // run immediately on the leading edge
+);
+
+this.registerEvent(
+  this.app.vault.on("modify", () => debouncedRebuild())
+);
+```
+
+Obsidian ships a `debounce` utility — prefer it over writing your own.
+
+## Use `registerInterval` for periodic tasks
+
+Never use a raw `setInterval`. When a plugin is disabled, raw intervals keep running, leaking memory and CPU. Use `this.registerInterval` instead — Obsidian automatically clears it when the plugin unloads.
+
+```typescript
+// Correct: Obsidian clears this on unload
+this.registerInterval(
+  window.setInterval(() => console.log("tick"), 5 * 60 * 1000)
+);
+
+// Incorrect: this interval leaks on disable
+setInterval(() => console.log("tick"), 5 * 60 * 1000);
+```
+
+The sample plugin demonstrates this pattern in `main.ts:69`.
+
+## Avoid unnecessary vault scans
+
+`this.app.vault.getMarkdownFiles()` returns every Markdown file in the vault. On a large vault this can be thousands of files. Calling it on every keystroke, file-open event, or DOM mutation is a common source of performance problems.
+
+```typescript
+// Expensive: called on every file-open event
+this.registerEvent(
+  this.app.workspace.on("file-open", () => {
+    const files = this.app.vault.getMarkdownFiles(); // potentially thousands
+    this.processAll(files);
+  })
+);
+```
+
+Instead, build your index once and update it incrementally:
+
+```typescript
+private fileCache: TFile[] | undefined;
+
+getFiles(): TFile[] {
+  if (!this.fileCache) {
+    this.fileCache = this.app.vault.getMarkdownFiles();
+  }
+  return this.fileCache;
+}
+
+async onload() {
+  // Invalidate cache when the vault changes
+  this.registerEvent(
+    this.app.vault.on("create", () => (this.fileCache = undefined))
+  );
+  this.registerEvent(
+    this.app.vault.on("delete", () => (this.fileCache = undefined))
+  );
+}
+```
+
+<Tip>
+Use `this.app.vault.getMarkdownFiles()` only when necessary, and cache the result if you need it multiple times in quick succession. On a 10,000-file vault, repeated full scans add up fast.
+</Tip>
+
+## Batch disk access
+
+Every `vault.read()` or `vault.modify()` call is an async disk operation. If you need to process multiple files, batch reads where possible and avoid issuing them one-by-one inside a tight loop without any concurrency control.
+
+```typescript
+// Reads all files concurrently — can overwhelm I/O on large vaults
+const contents = await Promise.all(files.map((f) => this.app.vault.read(f)));
+
+// Better: process in bounded chunks
+async function readInBatches(files: TFile[], batchSize = 20) {
+  const results: string[] = [];
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    results.push(...(await Promise.all(batch.map((f) => app.vault.read(f)))));
+  }
+  return results;
+}
+```
+
+## Memory
+
+Avoid holding large in-memory structures indefinitely. If you cache parsed content, limit the cache size or use a time-to-live strategy. This matters especially on mobile, where available memory is constrained.
+
+<Tip>
+Profile your plugin's startup contribution using the Obsidian developer console (`Ctrl+Shift+I` on desktop). Look for long synchronous tasks in the Performance tab during vault load.
+</Tip>

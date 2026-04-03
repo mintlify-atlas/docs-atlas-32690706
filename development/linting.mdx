@@ -1,0 +1,157 @@
+---
+title: "Linting"
+description: "Use ESLint with the Obsidian-specific plugin to catch bugs and enforce code style"
+---
+
+The project uses [ESLint](https://eslint.org) with two plugins to enforce code quality:
+
+- **`eslint-plugin-obsidianmd`** — Obsidian-specific rules that catch common plugin mistakes
+- **`typescript-eslint`** — TypeScript-aware rules that use type information to find bugs that plain ESLint cannot
+
+## Running the linter
+
+```bash
+npm run lint
+```
+
+This runs `eslint .` against the entire project, following the ignore list in `eslint.config.mts`.
+
+To lint only the source directory manually (for example, after installing ESLint globally):
+
+```bash
+npm install -g eslint
+eslint ./src/
+```
+
+<Tip>
+  Fix lint errors before committing. The CI pipeline runs `npm run lint` on every push and pull request, and a failing lint check blocks your build.
+</Tip>
+
+## ESLint config
+
+The full configuration lives in `eslint.config.mts`:
+
+```typescript eslint.config.mts
+import tseslint from 'typescript-eslint';
+import obsidianmd from "eslint-plugin-obsidianmd";
+import globals from "globals";
+import { globalIgnores } from "eslint/config";
+
+export default tseslint.config(
+	{
+		languageOptions: {
+			globals: {
+				...globals.browser,
+			},
+			parserOptions: {
+				projectService: {
+					allowDefaultProject: [
+						'eslint.config.js',
+						'manifest.json'
+					]
+				},
+				tsconfigRootDir: import.meta.dirname,
+				extraFileExtensions: ['.json']
+			},
+		},
+	},
+	...obsidianmd.configs.recommended,
+	globalIgnores([
+		"node_modules",
+		"dist",
+		"esbuild.config.mjs",
+		"eslint.config.js",
+		"version-bump.mjs",
+		"versions.json",
+		"main.js",
+	]),
+);
+```
+
+## Plugins and rules
+
+### `eslint-plugin-obsidianmd`
+
+This plugin provides rules specific to Obsidian plugin development. The `obsidianmd.configs.recommended` preset enables all recommended rules, which cover patterns like:
+
+- Correct usage of Obsidian API methods
+- Avoiding patterns that leak listeners or cause memory issues
+- Enforcing safe plugin lifecycle practices
+
+The plugin is maintained alongside the Obsidian API and updated as new guidelines emerge.
+
+### `typescript-eslint`
+
+`typescript-eslint` replaces ESLint's default parser with the TypeScript compiler, giving lint rules access to full type information. This enables type-aware rules that can catch bugs that regular ESLint cannot find — for example, detecting `await` on a non-Promise value or unsafe member access on a nullable type.
+
+The config wraps everything with `tseslint.config(...)`, which handles parser setup and rule configuration in a type-safe way.
+
+### `parserOptions.projectService`
+
+```typescript
+parserOptions: {
+  projectService: {
+    allowDefaultProject: [
+      'eslint.config.js',
+      'manifest.json'
+    ]
+  },
+  tsconfigRootDir: import.meta.dirname,
+  extraFileExtensions: ['.json']
+}
+```
+
+`projectService` tells `typescript-eslint` to use the TypeScript language service to resolve files and their types. This is required for type-aware rules to work.
+
+`allowDefaultProject` lists files that are not covered by `tsconfig.json` but still need to be linted — in this case `eslint.config.js` and `manifest.json`. Without this list, ESLint would error on those files.
+
+`extraFileExtensions: ['.json']` allows ESLint to parse `.json` files so that `manifest.json` can be included in the lint pass.
+
+## Ignored files
+
+The `globalIgnores` call at the end of the config excludes generated and tooling files from linting:
+
+| Ignored path | Reason |
+|---|---|
+| `node_modules` | Third-party packages, not your code |
+| `dist` | Build output directory |
+| `esbuild.config.mjs` | Build script, not plugin source |
+| `eslint.config.js` | Compiled version of `eslint.config.mts` |
+| `version-bump.mjs` | Release helper script |
+| `versions.json` | Version map data file |
+| `main.js` | Bundled output — never lint generated files |
+
+## CI workflow
+
+Linting runs automatically on every push and pull request via GitHub Actions:
+
+```yaml .github/workflows/lint.yml
+name: Node.js build
+
+on:
+    push:
+        branches: ["**"]
+    pull_request:
+        branches: ["**"]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        strategy:
+            matrix:
+                node-version: [20.x, 22.x]
+
+        steps:
+            - uses: actions/checkout@v4
+            - name: Use Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: "npm"
+            - run: npm ci
+            - run: npm run build --if-present
+            - run: npm run lint
+```
+
+The workflow runs against Node.js 20 and 22 in a matrix. Both `npm run build` and `npm run lint` must pass on all matrix combinations. A lint failure on any combination marks the check as failed.
